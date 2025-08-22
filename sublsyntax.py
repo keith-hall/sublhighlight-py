@@ -31,6 +31,7 @@ all_syntaxes_paths = list(
 		all_syntaxes_basenames
 	)
 )
+# Module-level cache - can be improved to instance-based
 LOAD_SYNTAX_CACHE = {}
 __hl_parsed_key = "__hl_parsed"
 
@@ -40,6 +41,7 @@ def ctx_findprop(ctx, key, default):
 
 
 def loadsyntax(path, cache=True):
+	"""Load syntax from file with optional caching."""
 	if cache and path in LOAD_SYNTAX_CACHE:
 		return LOAD_SYNTAX_CACHE[path]
 	with open(path, "rb") as f:
@@ -47,6 +49,12 @@ def loadsyntax(path, cache=True):
 		if cache:
 			LOAD_SYNTAX_CACHE[path] = syntax
 		return syntax
+
+
+def clear_syntax_cache():
+	"""Clear the global syntax cache - useful for testing."""
+	global LOAD_SYNTAX_CACHE
+	LOAD_SYNTAX_CACHE = {}
 
 
 def loadsyntax_until(path, marker_regexes, cache=True):
