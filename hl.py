@@ -600,103 +600,110 @@ class SyntaxHighlighter:
 
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser()
-	parser.add_argument("-s", "--syntax", type=str, help="sublime-syntax to use", nargs="?", default=None)
-	parser.add_argument("-c", "--color-scheme", type=str, help="sublime-color-scheme to use", nargs="?", default="Default")
-	parser.add_argument("-d", "--debug", action="store_true", help="turn debugging on", default=False)
-	parser.add_argument("-S", "--show-scopes", action="store_true", help="output scopes tags", default=False)
-	parser.add_argument("-ls", "--list-syntaxes", action="store_true", help="list available syntaxes", default=False)
-	parser.add_argument("-lc", "--list-color-schemes", action="store_true", help="list available color schemes", default=False)
-	parser.add_argument("input_file", type=str, help="input file", nargs="?", default=None)
-	args = parser.parse_args()
-	global dbg
-	if args.debug:
-		dbg = print
-		if dbg: dbg("="*20)
-	else:
-		dbg = None
-	if args.list_syntaxes:
-		import json
-		print(
-			json.dumps(
-				{
-					"syntaxes": all_syntaxes_names
-				},
-				indent=2
+	# Maintain backwards compatibility while using modern components
+	try:
+		from app import SyntaxHighlighterApp
+		app = SyntaxHighlighterApp()
+		app.run()
+	except ImportError:
+		# Fallback to original implementation if new modules aren't available
+		parser = argparse.ArgumentParser()
+		parser.add_argument("-s", "--syntax", type=str, help="sublime-syntax to use", nargs="?", default=None)
+		parser.add_argument("-c", "--color-scheme", type=str, help="sublime-color-scheme to use", nargs="?", default="Default")
+		parser.add_argument("-d", "--debug", action="store_true", help="turn debugging on", default=False)
+		parser.add_argument("-S", "--show-scopes", action="store_true", help="output scopes tags", default=False)
+		parser.add_argument("-ls", "--list-syntaxes", action="store_true", help="list available syntaxes", default=False)
+		parser.add_argument("-lc", "--list-color-schemes", action="store_true", help="list available color schemes", default=False)
+		parser.add_argument("input_file", type=str, help="input file", nargs="?", default=None)
+		args = parser.parse_args()
+		global dbg
+		if args.debug:
+			dbg = print
+			if dbg: dbg("="*20)
+		else:
+			dbg = None
+		if args.list_syntaxes:
+			import json
+			print(
+				json.dumps(
+					{
+						"syntaxes": all_syntaxes_names
+					},
+					indent=2
+				)
 			)
-		)
-	if args.list_color_schemes:
-		import json
-		print(
-			json.dumps(
+		if args.list_color_schemes:
+			import json
+			print(
+				json.dumps(
 				{
-					"color-schemes": all_color_schemes_names
-				},
-				indent=2
+						"color-schemes": all_color_schemes_names
+					},
+					indent=2
+				)
 			)
-		)
-	if args.list_syntaxes or args.list_color_schemes:
-		exit()
-	first_stdin_line = None
-	input_stream = open(args.input_file, "r") if args.input_file else sys.stdin
-	if args.syntax is None:
-		fastloadpatts = (re.compile("^file_extensions:"), re.compile("^first_line_match"))
-		all_syntaxes = loadsyntaxesmp(all_syntaxes_paths, lambda path:loadsyntax_until(path, fastloadpatts, cache=False))
-		if args.input_file:
-			file_ext = os.path.splitext(args.input_file)[1].lstrip(".")
-			for syntax_name, syntax in all_syntaxes.items():
-				if syntax:
-					file_extensions = syntax.get("file_extensions", [])
-					if file_ext in file_extensions:
-						args.syntax = syntax_name
-						break
+		if args.list_syntaxes or args.list_color_schemes:
+			exit()
+		first_stdin_line = None
+		input_stream = open(args.input_file, "r") if args.input_file else sys.stdin
 		if args.syntax is None:
-			for line in input_stream:
-				first_stdin_line = line
+			fastloadpatts = (re.compile("^file_extensions:"), re.compile("^first_line_match"))
+			all_syntaxes = loadsyntaxesmp(all_syntaxes_paths, lambda path:loadsyntax_until(path, fastloadpatts, cache=False))
+			if args.input_file:
+				file_ext = os.path.splitext(args.input_file)[1].lstrip(".")
 				for syntax_name, syntax in all_syntaxes.items():
 					if syntax:
-						first_line_match = syntax.get("first_line_match", None)
-						if first_line_match:
-							if re.match(first_line_match, line):
-								args.syntax = syntax_name
-								break
-				break
-		del all_syntaxes
-	if args.syntax is None:
-		args.syntax = "Default"
-	main_syntax_path = os.path.abspath(
-		os.path.join(
-			syntax_dir_path,
-			f"{args.syntax}.{sublsynt_ext}"
+						file_extensions = syntax.get("file_extensions", [])
+						if file_ext in file_extensions:
+							args.syntax = syntax_name
+							break
+			if args.syntax is None:
+				for line in input_stream:
+					first_stdin_line = line
+					for syntax_name, syntax in all_syntaxes.items():
+						if syntax:
+							first_line_match = syntax.get("first_line_match", None)
+							if first_line_match:
+								if re.match(first_line_match, line):
+									args.syntax = syntax_name
+									break
+					break
+			del all_syntaxes
+		if args.syntax is None:
+			args.syntax = "Default"
+		main_syntax_path = os.path.abspath(
+			os.path.join(
+				syntax_dir_path,
+				f"{args.syntax}.{sublsynt_ext}"
+			)
 		)
-	)
-	main_syntax = parsesyntax(
-		loadsyntax(main_syntax_path)
-	)
-	color_scheme_path = os.path.abspath(
-		os.path.join(
-			color_scheme_dir_path,
-			f"{args.color_scheme}.{sublcolscheme_ext}"
+		main_syntax = parsesyntax(
+			loadsyntax(main_syntax_path)
 		)
-	)
-	color_scheme = parsecolorscheme(
-		loadcolorscheme(color_scheme_path)
-	)
-	output = sys.stdout if not args.debug else StringIO()
-	shl = SyntaxHighlighter(
-		main_syntax,
-		color_scheme,
-		output,
-		show_scopes=args.show_scopes
-	)
-	shl.begin()
-	if first_stdin_line:
-		shl.process(first_stdin_line)
-		output.flush()
-	for line in input_stream:
-		shl.process(line)
-		output.flush()
-	shl.end()
-	if args.debug:
-		print(output.getvalue())
-		output.close()
+		color_scheme_path = os.path.abspath(
+			os.path.join(
+				color_scheme_dir_path,
+				f"{args.color_scheme}.{sublcolscheme_ext}"
+			)
+		)
+		color_scheme = parsecolorscheme(
+			loadcolorscheme(color_scheme_path)
+		)
+		output = sys.stdout if not args.debug else StringIO()
+		shl = SyntaxHighlighter(
+			main_syntax,
+			color_scheme,
+			output,
+			show_scopes=args.show_scopes
+		)
+		shl.begin()
+		if first_stdin_line:
+			shl.process(first_stdin_line)
+			output.flush()
+		for line in input_stream:
+			shl.process(line)
+			output.flush()
+		shl.end()
+		if args.debug:
+			print(output.getvalue())
+			output.close()
